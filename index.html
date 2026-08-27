@@ -153,14 +153,14 @@
 <div class="custom-modal-overlay" id="customModal">
   <div class="custom-modal">
     <div class="modal-icon">⚠️</div>
-    <div class="modal-title">提示</div>
+    <div class="modal-title" id="modalTitle">警告</div>
     <div class="modal-message" id="modalText">輸入的姓名必須與填寫者姓名完全一致。</div>
     <button class="modal-btn" onclick="closeModal()">我知道了</button>
   </div>
 </div>
 
 <script>
-  // 1. 已更新為您正確的 Cloudflare Worker 網址
+  // ⚠️ 請修改為您真實部署的 Cloudflare Worker 網址
   const WORKER_URL = "https://q826t01.ector-7af.workers.dev";
 
   let questions = [];
@@ -169,12 +169,21 @@
   let verifiedStatus = {}; 
   let confirmDetailsList = [];
 
-  function showLoading(show) {
-    document.getElementById('loading').classList.toggle('hidden', !show);
+  // 通用 API 發送函式
+  async function callWorkerApi(action, data = null) {
+    const response = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: action, data: data })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
   }
 
-  function showCustomModal(msg, title = '警告') {
-    document.getElementById('modalTitle').innerText = title;
+  function showCustomModal(msg) {
     document.getElementById('modalText').innerText = msg;
     document.getElementById('customModal').classList.add('active');
   }
@@ -183,30 +192,7 @@
     document.getElementById('customModal').classList.remove('active');
   }
 
-  // 統一呼叫 Cloudflare Worker API 函式
-  async function callWorkerApi(action, data = null) {
-    showLoading(true);
-    try {
-      const response = await fetch(WORKER_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: action, data: data })
-      });
-
-      const resData = await response.json();
-      if (resData.status !== "success") {
-        throw new Error(resData.message || "後端處理失敗");
-      }
-      return resData.data;
-    } catch (err) {
-      console.error(err);
-      showCustomModal(`網路連線失敗或後端錯誤：\n${err.message}`);
-      throw err;
-    } finally {
-      showLoading(false);
-    }
-  }
-
+  // 1. 取得題目 (步驟 1 -> 2)
   async function goToQuiz() {
     if(document.getElementById('courseCheck').value === 'no') {
       showCustomModal('請先上完課再填寫！'); return;
@@ -215,25 +201,19 @@
       showCustomModal('請填寫所有必填欄位！'); return;
     }
 
+    const btn = document.getElementById('btnStep1');
+    btn.disabled = true;
+    btn.innerText = "載入題目中...";
+
     try {
-      let data = await callWorkerApi("getQuestions");
-      
-      // 相容性檢查：若回傳資料被字串化，自動解析為 JSON 物件
-      if (typeof data === 'string') {
-        data = JSON.parse(data);
-      }
-      // 防呆檢查：如果 data 內包含 data 屬性（多包一層的情況）
-      if (data && data.data && Array.isArray(data.data)) {
-        data = data.data;
-      }
-
-      if (!Array.isArray(data)) {
-        throw new Error("取得的題目資料格式不正確，預期為陣列。");
-      }
-
+      const data = await callWorkerApi("getQuestions");
       showQuiz(data);
-    } catch(e) {
-      console.error("載入題目失敗：", e);
+    } catch (err) {
+      console.error(err);
+      showCustomModal("網路連線失敗或後端錯誤，無法取得題目，請重新嘗試！");
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "下一步";
     }
   }
 
@@ -270,7 +250,7 @@
     document.getElementById('step3').classList.remove('hidden');
   }
 
-  // 階段一：第一次提交評分（寫入 A ~ J 欄）
+  // 2. 第一次提交評分（寫入 A ~ J 欄）
   async function submitQuiz() {
     let correctCount = 0;
     let userAnswers = [];
@@ -311,7 +291,12 @@
       feedback: document.getElementById('feedbackCheck').value === '有' ? document.getElementById('feedbackText').value : '無'
     };
 
+    const btn = document.getElementById('btnSubmitQuiz');
+    btn.disabled = true;
+    btn.innerText = "提交計算中...";
+
     try {
+      // 呼叫 API 寫入 A~J 欄
       await callWorkerApi("submitInitialForm", cachedFormData);
       console.log("初次成績已寫入 A~J 欄");
 
@@ -329,7 +314,13 @@
       } else {
         renderErrors();
       }
-    } catch(e) {}
+    } catch (err) {
+      console.error(err);
+      showCustomModal("提交成績失敗，請檢查網路後重新嘗試！");
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "提交並評分";
+    }
   }
 
   function renderErrors() {
@@ -386,7 +377,10 @@
         await callWorkerApi("submitFinalConfirmation", cachedFormData);
         console.log("錯題確認時間與明細已成功寫入 K~L 欄");
         document.getElementById('finalSubmitBtn').classList.remove('hidden');
-      } catch(e) {}
+      } catch (err) {
+        console.error(err);
+        showCustomModal("簽名確認紀錄寫入失敗，請檢查網路連線！");
+      }
     }
   }
 
@@ -415,5 +409,10 @@
     confirmDetailsList = [];
   }
 </script>
+  <!-- 載入中遮罩 -->
+<div id="loading" class="loading-overlay hidden">
+  <div class="spinner"></div>
+  <p style="margin-top: 10px; font-weight: bold;">資料處理中，請稍候...</p>
+</div>
 </body>
 </html>
