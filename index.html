@@ -56,18 +56,17 @@
     }
     button.btn:hover { opacity: 0.9; }
     
-    /* 題目卡片優化 */
+    /* 題目卡片與選項卡片卡片化 */
     .question-card {
       background: #f9f9f9;
-      padding: 15px;
+      padding: 18px;
       border-radius: 8px;
       margin-bottom: 20px;
       border-left: 5px solid var(--primary-color);
     }
     .question-title {
       font-weight: bold;
-      margin-bottom: 12px;
-      white-space: pre-wrap;
+      margin-bottom: 15px;
       font-size: 16px;
       line-height: 1.6;
       word-break: break-word;
@@ -76,7 +75,6 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      margin-top: 10px;
     }
     .option-btn-label {
       background: #ffffff;
@@ -106,11 +104,8 @@
       border-color: var(--primary-color);
       font-weight: bold;
     }
-    .option-text {
-      white-space: pre-wrap;
-    }
     
-    /* 檢討與錯題簽名專區 */
+    /* 錯題檢討區 */
     .wrong-card {
       background: #fff0f0;
       border: 1px solid #ffcdd2;
@@ -232,9 +227,9 @@
 <script>
   const API_URL = 'https://q826t01.ector-7af.workers.dev/';
 
-  let currentQuestions = []; // 存這 10 題
-  let userAnswers = [];      // 測驗者答案
-  let wrongItems = [];       // 錯題清單
+  let currentQuestions = []; 
+  let userAnswers = [];      
+  let wrongItems = [];       
   let submittedRowIndex = null;
 
   function showCustomModal(msg, title = '提示') {
@@ -260,7 +255,6 @@
     window.scrollTo(0, 0);
   }
 
-  // 1. 驗證資料並從 Worker 撈選 10 題
   function startQuiz() {
     const classDate = document.getElementById('classDate').value;
     const department = document.getElementById('department').value.trim();
@@ -296,50 +290,47 @@
       });
   }
 
-  // 強化的 C 欄「題目內容」解析函式
+  // 專門針對有換行結構 C 欄進行清理與精準拆解的函式
   function parseQuestionContent(rawText) {
-    if (!rawText) return { mainQuestion: '題目無內容', options: { A:'選項 A', B:'選項 B', C:'選項 C', D:'選項 D' } };
+    if (!rawText) return { mainQuestion: '題目無內容', options: { A:'(A)', B:'(B)', C:'(C)', D:'(D)' } };
 
-    const text = rawText.toString().trim();
+    let text = rawText.toString().trim();
     
-    // 判斷是否包含 (A) 或 (a) 或 （A）
-    const matchA = text.match(/[\(\（][Aa][\)\）]/);
+    // 1. 統一全半形括號
+    text = text.replace(/（/g, '(').replace(/）/g, ')');
+
+    // 2. 尋找第一個 (A) 或 (a) 的位置
+    const matchA = text.match(/\([Aa]\)/);
 
     if (!matchA) {
-      // 若無選項標記，顯示整段作為題目
       return {
-        mainQuestion: text,
-        options: { A: 'A', B: 'B', C: 'C', D: 'D' }
+        mainQuestion: text.replace(/\n+/g, ' '),
+        options: { A: '(A)', B: '(B)', C: '(C)', D: '(D)' }
       };
     }
 
-    // 擷取 (A) 之前的文字為主要題目
-    const mainQuestion = text.substring(0, matchA.index).trim();
-    const optionsText = text.substring(matchA.index).trim();
+    // 3. 截取題目主要內容（去掉內部多餘換行）
+    const mainQuestion = text.substring(0, matchA.index).replace(/\n+/g, ' ').trim();
+    const optionsBlock = text.substring(matchA.index);
 
-    // 剖析 A, B, C, D 區塊
-    const regexA = /[\(\（][Aa][\)\）]\s*([\s\S]*?)(?=[\(\（][Bb][\)\）]|$)/;
-    const regexB = /[\(\（][Bb][\)\）]\s*([\s\S]*?)(?=[\(\（][Cc][\)\）]|$)/;
-    const regexC = /[\(\（][Cc][\)\）]\s*([\s\S]*?)(?=[\(\（][Dd][\)\）]|$)/;
-    const regexD = /[\(\（][Dd][\)\）]\s*([\s\S]*?)$/;
+    // 4. 正則精準切分 (A)、(B)、(C)、(D)
+    const regex = /\(([A-Da-d])\)\s*([\s\S]*?)(?=\([A-Da-d]\)|$)/g;
+    let match;
+    const opts = { A: '(A)', B: '(B)', C: '(C)', D: '(D)' };
 
-    const matchOptA = optionsText.match(regexA);
-    const matchOptB = optionsText.match(regexB);
-    const matchOptC = optionsText.match(regexC);
-    const matchOptD = optionsText.match(regexD);
+    while ((match = regex.exec(optionsBlock)) !== null) {
+      const key = match[1].toUpperCase();
+      // 將選項文字內多餘的換行清掉
+      const val = match[2].replace(/\n+/g, ' ').trim();
+      opts[key] = `(${key}) ${val}`;
+    }
 
     return {
-      mainQuestion: mainQuestion || text,
-      options: {
-        A: matchOptA ? '(A) ' + matchOptA[1].trim() : '(A)',
-        B: matchOptB ? '(B) ' + matchOptB[1].trim() : '(B)',
-        C: matchOptC ? '(C) ' + matchOptC[1].trim() : '(C)',
-        D: matchOptD ? '(D) ' + matchOptD[1].trim() : '(D)'
-      }
+      mainQuestion: mainQuestion,
+      options: opts
     };
   }
 
-  // 渲染 10 題題目與選項
   function renderQuiz(questions) {
     const container = document.getElementById('quizContainer');
     container.innerHTML = '';
@@ -348,7 +339,6 @@
       const qIndex = idx + 1;
       const parsed = parseQuestionContent(q.question);
       
-      // 保存清洗後的純題目文字，以供錯題檢討區使用
       q.cleanQuestion = parsed.mainQuestion;
 
       container.innerHTML += `
@@ -357,19 +347,19 @@
           <div class="options-group">
             <label class="option-btn-label">
               <input type="radio" name="q_${qIndex}" value="A">
-              <span class="option-text">${parsed.options.A}</span>
+              <span>${parsed.options.A}</span>
             </label>
             <label class="option-btn-label">
               <input type="radio" name="q_${qIndex}" value="B">
-              <span class="option-text">${parsed.options.B}</span>
+              <span >${parsed.options.B}</span>
             </label>
             <label class="option-btn-label">
               <input type="radio" name="q_${qIndex}" value="C">
-              <span class="option-text">${parsed.options.C}</span>
+              <span>${parsed.options.C}</span>
             </label>
             <label class="option-btn-label">
               <input type="radio" name="q_${qIndex}" value="D">
-              <span class="option-text">${parsed.options.D}</span>
+              <span>${parsed.options.D}</span>
             </label>
           </div>
         </div>
@@ -377,7 +367,6 @@
     });
   }
 
-  // 2. 提交測驗 (寫入 A~J 欄)
   function submitQuiz() {
     userAnswers = [];
     wrongItems = [];
@@ -449,7 +438,6 @@
     });
   }
 
-  // 3. 渲染檢討與錯題簽名區域
   function renderReviewSection(score, accuracyStr) {
     document.getElementById('scoreDisplay').innerText = `您的測驗得分：${score} 分 (答對率：${accuracyStr})`;
     const container = document.getElementById('reviewContainer');
@@ -468,7 +456,7 @@
       html += `
         <div class="wrong-card">
           <p><strong>錯題 ${index + 1} (測驗第 ${item.quizNum} 題 / 題庫第 ${item.bankId} 題)：</strong></p>
-          <p style="white-space: pre-wrap; font-size: 15px;">${item.question}</p>
+          <p style="font-size: 15px;">${item.question}</p>
           <p style="color:var(--error-color); font-weight: bold;">您的回答：${item.userAns} ❌ ｜ 正確答案：${item.correctAns}  </p>
           <label style="margin-top:10px;">請簽寫「${userName}」：</label>
           <canvas id="canvas_${index}" class="sig-canvas"></canvas>
@@ -481,7 +469,6 @@
     setTimeout(initCanvases, 100);
   }
 
-  // 初始化手寫簽名板
   let canvasContexts = [];
   function initCanvases() {
     canvasContexts = [];
@@ -536,7 +523,6 @@
     }
   }
 
-  // 4. 提交簽名 (寫入 K~L 欄)
   function submitSignature() {
     if (wrongItems.length > 0) {
       for (let i = 0; i < wrongItems.length; i++) {
