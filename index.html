@@ -14,7 +14,7 @@
       --success-color: #5cb85c;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: "Microsoft JhengHei", "微軟正黑體", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background-color: var(--bg-color);
       color: var(--text-color);
       margin: 0;
@@ -42,6 +42,7 @@
       border-radius: 6px;
       box-sizing: border-box;
       font-size: 15px;
+      font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
     }
     button.btn {
       width: 100%;
@@ -53,6 +54,7 @@
       font-size: 16px;
       cursor: pointer;
       margin-top: 15px;
+      font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
     }
     button.btn:hover { opacity: 0.9; }
     
@@ -111,24 +113,35 @@
       border-radius: 8px;
       margin-bottom: 15px;
     }
+
+    .signature-box {
+      margin-top: 25px;
+      padding: 15px;
+      background: #fdfdfd;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+
     .sig-canvas {
       border: 2px dashed #999;
       background: #fff;
       width: 100%;
-      height: 120px;
+      height: 140px;
       border-radius: 6px;
       touch-action: none;
       cursor: crosshair;
     }
+
     .clear-sig-btn {
       background: #888;
       color: white;
       border: none;
-      padding: 4px 10px;
+      padding: 6px 12px;
       border-radius: 4px;
-      font-size: 12px;
+      font-size: 13px;
       cursor: pointer;
-      margin-top: 5px;
+      margin-top: 8px;
+      font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
     }
 
     .custom-modal-overlay {
@@ -191,18 +204,26 @@
     <button class="btn" onclick="submitQuiz()">提交測驗並計算成績</button>
   </div>
 
-  <!-- 階段 3：測驗結果與錯題簽名 -->
+  <!-- 階段 3：測驗結果與錯題檢討 + 簽名 -->
   <div id="step3" class="step-section">
     <h3>階段 3：測驗結果與檢討</h3>
     <div id="scoreDisplay" style="font-size: 20px; font-weight: bold; margin-bottom: 15px; color: var(--primary-color);"></div>
     <div id="reviewContainer"></div>
+
+    <!-- 提交前的簽名板區塊 -->
+    <div class="signature-box">
+      <label for="finalCanvas" style="font-size: 16px;">請最後確認簽名：</label>
+      <canvas id="finalCanvas" class="sig-canvas"></canvas>
+      <button class="clear-sig-btn" onclick="clearFinalCanvas()">清除重簽</button>
+    </div>
+
     <button class="btn" id="sigSubmitBtn" onclick="submitSignature()">完成簽名並送出紀錄</button>
   </div>
 
   <!-- 階段 4：完成 -->
   <div id="step4" class="step-section">
     <h3>測驗完成</h3>
-    <p style="color: var(--success-color); font-weight: bold; font-size: 18px;">恭喜您！您的測驗紀錄與確認簽名已成功寫入系統。</p>
+    <p style="color: var(--success-color); font-weight: bold; font-size: 18px;">恭喜您！您的測驗紀錄、錯題檢討與確認簽名已成功寫入系統。</p>
     <p>感謝您的配合，您可以關閉此頁面。</p>
   </div>
 </div>
@@ -226,8 +247,11 @@
 
   let currentQuestions = []; 
   let userAnswers = [];      
-  let wrongItems = [];       
+  let wrongItems = [];        
   let submittedRowIndex = null;
+  
+  let finalCanvasCtx = null;
+  let isFinalCanvasSigned = false;
 
   function showCustomModal(msg, title = '提示') {
     document.getElementById('modalTitle').innerText = title;
@@ -287,19 +311,16 @@
       });
   }
 
-  // 萬用防護型拆解邏輯
+  // 拆解題目與選項內容
   function parseQuestionContent(qObj) {
-    // 相容各種 Worker 欄位命名
     let rawText = qObj.question || qObj.questionContent || qObj.content || qObj.title || '';
     
     if (typeof rawText !== 'string') {
       rawText = JSON.stringify(rawText);
     }
 
-    // 替換全形括號與常見換行符號
     let text = rawText.replace(/（/g, '(').replace(/）/g, ')').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 
-    // 尋找第一個 (A) 或 (a)
     const matchA = text.match(/\([Aa]\)/);
 
     if (!matchA) {
@@ -309,11 +330,9 @@
       };
     }
 
-    // 截取題目主要文字
     const mainQuestion = text.substring(0, matchA.index).replace(/\n+/g, ' ').trim();
     const optionsBlock = text.substring(matchA.index);
 
-    // 切分 A, B, C, D 區塊
     const regex = /\(([A-Da-d])\)\s*([\s\S]*?)(?=\([A-Da-d]\)|$)/g;
     let match;
     const opts = {};
@@ -411,6 +430,7 @@
       classDate: formattedClassDate,
       department: document.getElementById('department').value.trim(),
       userName: document.getElementById('userName').value.trim(),
+      watchClass: document.getElementById('watchClass').value,
       bankIds: currentQuestions.map(q => q.bankId),
       correctAnswers: currentQuestions.map(q => q.answer),
       userAnswers: userAnswers,
@@ -448,70 +468,71 @@
     container.innerHTML = '';
 
     if (wrongItems.length === 0) {
-      container.innerHTML = `<p style="color:var(--success-color); font-weight:bold; font-size: 16px;">恭喜您全對！無需進行錯題簽名。</p>`;
-      document.getElementById('sigSubmitBtn').innerText = "確認送出";
-      return;
+      container.innerHTML = `<p style="color:var(--success-color); font-weight:bold; font-size: 16px;">恭喜您全對！無需填寫錯題檢討。</p>`;
+    } else {
+      let html = `<p style="color:var(--error-color); font-weight:bold; font-size: 15px;">您有 ${wrongItems.length} 題答錯。請於下方說明錯題原因與檢討心得：</p>`;
+
+      wrongItems.forEach((item, index) => {
+        html += `
+          <div class="wrong-card">
+            <p><strong>錯題 ${index + 1} (測驗第 ${item.quizNum} 題 / 題庫第 ${item.bankId} 題)：</strong></p>
+            <p style="font-size: 15px;">${item.question}</p>
+            <p style="color:var(--error-color); font-weight: bold;">您的回答：${item.userAns} ❌ ｜ 正確答案：${item.correctAns}</p>
+            <div class="form-group" style="margin-top: 10px;">
+              <label for="review_reason_${index}">錯題檢討與說明 (必填)：</label>
+              <textarea id="review_reason_${index}" rows="2" placeholder="請填寫此題答錯原因或觀念檢討..."></textarea>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
     }
 
-    const userName = document.getElementById('userName').value.trim();
-    let html = `<p style="color:var(--error-color); font-weight:bold; font-size: 15px;">您有 ${wrongItems.length} 題答錯。請針對下列錯題進行檢討，並於每題下方逐條簽上您的完整工號姓名「${userName}」以示確認：</p>`;
-
-    wrongItems.forEach((item, index) => {
-      html += `
-        <div class="wrong-card">
-          <p><strong>錯題 ${index + 1} (測驗第 ${item.quizNum} 題 / 題庫第 ${item.bankId} 題)：</strong></p>
-          <p style="font-size: 15px;">${item.question}</p>
-          <p style="color:var(--error-color); font-weight: bold;">您的回答：${item.userAns} ❌ ｜ 正確答案：${item.correctAns}  </p>
-          <label style="margin-top:10px;">請簽寫「${userName}」：</label>
-          <canvas id="canvas_${index}" class="sig-canvas"></canvas>
-          <button class="clear-sig-btn" onclick="clearCanvas(${index})">清除重簽</button>
-        </div>
-      `;
-    });
-
-    container.innerHTML = html;
-    setTimeout(initCanvases, 100);
+    setTimeout(initFinalCanvas, 100);
   }
 
-  let canvasContexts = [];
-  function initCanvases() {
-    canvasContexts = [];
-    wrongItems.forEach((_, idx) => {
-      const cvs = document.getElementById(`canvas_${idx}`);
-      if (!cvs) return;
-      
-      cvs.width = cvs.offsetWidth;
-      cvs.height = cvs.offsetHeight;
-      const ctx = cvs.getContext('2d');
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#000';
-      canvasContexts[idx] = { cvs, ctx, isSigned: false };
+  // 初始化單一簽名板
+  function initFinalCanvas() {
+    const cvs = document.getElementById('finalCanvas');
+    if (!cvs) return;
 
-      let drawing = false;
+    cvs.width = cvs.offsetWidth;
+    cvs.height = cvs.offsetHeight;
+    
+    finalCanvasCtx = cvs.getContext('2d');
+    finalCanvasCtx.lineWidth = 3;
+    finalCanvasCtx.strokeStyle = '#000';
+    isFinalCanvasSigned = false;
 
-      function startDraw(e) {
-        drawing = true;
-        canvasContexts[idx].isSigned = true;
-        ctx.beginPath();
-        const pos = getPos(e, cvs);
-        ctx.moveTo(pos.x, pos.y);
-      }
-      function moveDraw(e) {
-        if (!drawing) return;
-        const pos = getPos(e, cvs);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.stroke();
-      }
-      function endDraw() { drawing = false; }
+    let drawing = false;
 
-      cvs.addEventListener('mousedown', startDraw);
-      cvs.addEventListener('mousemove', moveDraw);
-      cvs.addEventListener('mouseup', endDraw);
+    function startDraw(e) {
+      drawing = true;
+      isFinalCanvasSigned = true;
+      finalCanvasCtx.beginPath();
+      const pos = getPos(e, cvs);
+      finalCanvasCtx.moveTo(pos.x, pos.y);
+    }
 
-      cvs.addEventListener('touchstart', (e) => { startDraw(e.touches[0]); e.preventDefault(); });
-      cvs.addEventListener('touchmove', (e) => { moveDraw(e.touches[0]); e.preventDefault(); });
-      cvs.addEventListener('touchend', endDraw);
-    });
+    function moveDraw(e) {
+      if (!drawing) return;
+      const pos = getPos(e, cvs);
+      finalCanvasCtx.lineTo(pos.x, pos.y);
+      finalCanvasCtx.stroke();
+    }
+
+    function endDraw() {
+      drawing = false;
+    }
+
+    cvs.addEventListener('mousedown', startDraw);
+    cvs.addEventListener('mousemove', moveDraw);
+    cvs.addEventListener('mouseup', endDraw);
+
+    cvs.addEventListener('touchstart', (e) => { startDraw(e.touches[0]); e.preventDefault(); });
+    cvs.addEventListener('touchmove', (e) => { moveDraw(e.touches[0]); e.preventDefault(); });
+    cvs.addEventListener('touchend', endDraw);
   }
 
   function getPos(e, cvs) {
@@ -519,37 +540,47 @@
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
-  function clearCanvas(idx) {
-    const item = canvasContexts[idx];
-    if (item) {
-      item.ctx.clearRect(0, 0, item.cvs.width, item.cvs.height);
-      item.isSigned = false;
+  function clearFinalCanvas() {
+    const cvs = document.getElementById('finalCanvas');
+    if (cvs && finalCanvasCtx) {
+      finalCanvasCtx.clearRect(0, 0, cvs.width, cvs.height);
+      isFinalCanvasSigned = false;
     }
   }
 
   function submitSignature() {
+    // 檢查錯題檢討輸入框
+    let reviewNotesArr = [];
     if (wrongItems.length > 0) {
       for (let i = 0; i < wrongItems.length; i++) {
-        if (!canvasContexts[i] || !canvasContexts[i].isSigned) {
-          showCustomModal(`請完成第 ${i + 1} 道錯題的確認簽名！`);
+        const inputVal = document.getElementById(`review_reason_${i}`).value.trim();
+        if (!inputVal) {
+          showCustomModal(`請完整填寫第 ${i + 1} 道錯題的檢討內容！`);
           return;
         }
+        reviewNotesArr.push(`[錯題${wrongItems[i].quizNum}(題號${wrongItems[i].bankId})]: ${inputVal}`);
       }
     }
 
-    const signatureLogArr = wrongItems.map(item => {
-      return `${item.bankId}(${item.userAns}->${item.correctAns})..測驗[${item.quizNum}]`;
-    });
-    const signatureLogStr = signatureLogArr.join(',');
+    // 檢查簽名板
+    if (!isFinalCanvasSigned) {
+      showCustomModal('請於下方畫布完成手寫簽名後再送出！');
+      return;
+    }
 
-    showLoading(true, '正在寫入確認簽名紀錄...');
+    const cvs = document.getElementById('finalCanvas');
+    const signatureDataUrl = cvs.toDataURL('image/png');
+    const reviewSummaryStr = reviewNotesArr.join('； ') || '無錯題';
+
+    showLoading(true, '正在寫入檢討紀錄與確認簽名...');
 
     fetch(API_URL, {
       method: 'POST',
       body: JSON.stringify({
         action: 'submitSignature',
         rowIndex: submittedRowIndex,
-        signatureLog: signatureLogStr
+        reviewNotes: reviewSummaryStr,
+        signatureData: signatureDataUrl
       })
     })
     .then(res => res.json())
@@ -558,7 +589,7 @@
       if (resData.status === 'success') {
         switchStep(3, 4);
       } else {
-        showCustomModal('簽名提交失敗：' + resData.message);
+        showCustomModal('提交失敗：' + resData.message);
       }
     })
     .catch(err => {
