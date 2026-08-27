@@ -321,16 +321,11 @@
       });
   }
 
-  // 拆解題目與選項內容
   function parseQuestionContent(qObj) {
     let rawText = qObj.question || qObj.questionContent || qObj.content || qObj.title || '';
-    
-    if (typeof rawText !== 'string') {
-      rawText = JSON.stringify(rawText);
-    }
+    if (typeof rawText !== 'string') rawText = JSON.stringify(rawText);
 
     let text = rawText.replace(/（/g, '(').replace(/）/g, ')').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-
     const matchA = text.match(/\([Aa]\)/);
 
     if (!matchA) {
@@ -373,7 +368,7 @@
       const parsed = parseQuestionContent(q);
       
       q.cleanQuestion = parsed.mainQuestion;
-      q.parsedOptions = parsed.options; // 儲存拆解後的選項資訊
+      q.parsedOptions = parsed.options;
 
       container.innerHTML += `
         <div class="question-card">
@@ -423,11 +418,11 @@
         const correctAnsText = (qObj.parsedOptions && qObj.parsedOptions[qObj.answer]) ? qObj.parsedOptions[qObj.answer] : qObj.answer;
 
         wrongItems.push({
-          quizNum: i,
-          bankId: qObj.bankId,
-          userAns: uAns,
+          quizNum: i,                 // 這次隨機測驗的題號 (例如：5)
+          bankId: qObj.bankId,       // 題庫題號 (例如：38)
+          userAns: uAns,             // 測驗者錯答 (例如：B)
           userAnsText: userAnsText,
-          correctAns: qObj.answer,
+          correctAns: qObj.answer,    // 題庫正確答案 (例如：C)
           correctAnsText: correctAnsText,
           question: qObj.cleanQuestion || qObj.question
         });
@@ -515,7 +510,6 @@
     setTimeout(initFinalCanvas, 100);
   }
 
-  // 初始化單一簽名板
   function initFinalCanvas() {
     const cvs = document.getElementById('finalCanvas');
     if (!cvs) return;
@@ -571,22 +565,42 @@
     }
   }
 
+  // 擷取姓名關鍵字 (移除開頭英數字工號與空白)
+  function extractNameKey(fullInput) {
+    if (!fullInput) return '';
+    // 去除開頭英文與數字 (例如 A12345 -> 留張小明，若無工號則直接取完整文字)
+    let clean = fullInput.replace(/^[A-Za-z0-9_\-\s]+/, '').trim();
+    return clean || fullInput.trim();
+  }
+
   function submitSignature() {
-    // 檢查錯題確認欄位
-    let reviewNotesArr = [];
+    const originalUserName = document.getElementById('userName').value.trim();
+    const nameKey = extractNameKey(originalUserName);
+
+    // 1. 檢核與組合錯題確認字串
+    let formatSegments = [];
     if (wrongItems.length > 0) {
       for (let i = 0; i < wrongItems.length; i++) {
         const inputVal = document.getElementById(`review_reason_${i}`).value.trim();
+        
         if (!inputVal) {
           showCustomModal(`請於第 ${i + 1} 道錯題輸入工號姓名表示確認！`);
           return;
         }
-        // 打包包含題號、錯誤回答、正確答案與確認人資的完整紀錄
-        reviewNotesArr.push(`[錯題${wrongItems[i].quizNum}(題庫#${wrongItems[i].bankId})]: 答錯:${wrongItems[i].userAnsText} | 正確:${wrongItems[i].correctAnsText} | 確認者:${inputVal}`);
+
+        // 檢查是否包含階段 1 的「姓名」關鍵字
+        if (nameKey && !inputVal.includes(nameKey)) {
+          showCustomModal(`第 ${i + 1} 道錯題輸入內容需包含姓名「${nameKey}」，請確認後重新輸入！`);
+          return;
+        }
+
+        // 組成指定格式： 38(B->C)..測驗[5]
+        const item = wrongItems[i];
+        formatSegments.push(`${item.bankId}(${item.userAns}->${item.correctAns})..測驗[${item.quizNum}]`);
       }
     }
 
-    // 檢查簽名板
+    // 2. 檢核手寫簽名
     if (!isFinalCanvasSigned) {
       showCustomModal('請於下方畫布完成手寫簽名後再送出！');
       return;
@@ -594,11 +608,13 @@
 
     const cvs = document.getElementById('finalCanvas');
     const signatureDataUrl = cvs.toDataURL('image/png');
-    const reviewSummaryStr = reviewNotesArr.join('； ') || '無錯題';
+
+    // 多筆錯題以逗號串接
+    const reviewSummaryStr = formatSegments.join(',') || '無錯題';
 
     showLoading(true, '正在寫入確認紀錄與簽名...');
 
-    // 同時帶上 reviewNotes 與 reviewNote 以防止 Cloudflare Worker 變數名稱綁定不一致
+    // 同時送出 reviewNotes 與 reviewNote，確保後端無論定義哪種變數均能正確取值
     const postPayload = {
       action: 'submitSignature',
       rowIndex: submittedRowIndex,
