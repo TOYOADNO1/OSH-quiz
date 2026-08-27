@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>職業安全衛生線上測驗</title>
+  <title>職業安全衛生線上測驗系統</title>
   <style>
     :root {
       --primary-color: #0056b3;
       --bg-color: #f4f7f6;
       --card-bg: #ffffff;
       --text-color: #333;
+      --error-color: #d9534f;
+      --success-color: #5cb85c;
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -22,7 +24,7 @@
     }
     .container {
       width: 100%;
-      max-width: 650px;
+      max-width: 680px;
       background: var(--card-bg);
       padding: 25px;
       border-radius: 12px;
@@ -32,12 +34,13 @@
     .step-section.active { display: block; }
     .form-group { margin-bottom: 15px; }
     label { display: block; margin-bottom: 5px; font-weight: bold; }
-    input[type="text"], select {
+    input[type="text"], input[type="date"], textarea, select {
       width: 100%;
       padding: 10px;
       border: 1px solid #ccc;
       border-radius: 6px;
       box-sizing: border-box;
+      font-size: 15px;
     }
     button.btn {
       width: 100%;
@@ -48,43 +51,53 @@
       border-radius: 6px;
       font-size: 16px;
       cursor: pointer;
-      margin-top: 10px;
+      margin-top: 15px;
     }
     button.btn:hover { opacity: 0.9; }
     .question-card {
       background: #f9f9f9;
       padding: 15px;
       border-radius: 8px;
-      margin-bottom: 15px;
-      border-left: 4px solid var(--primary-color);
+      margin-bottom: 20px;
+      border-left: 5px solid var(--primary-color);
     }
-    .question-title { font-weight: bold; margin-bottom: 10px; whitespace: pre-line; }
-    .option-label { display: block; margin: 8px 0; cursor: pointer; }
+    .question-title { font-weight: bold; margin-bottom: 12px; white-space: pre-line; font-size: 16px; }
+    .options-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .option-btn-label {
+      flex: 1; min-width: 100px; background: white; border: 1px solid #ccc;
+      border-radius: 6px; padding: 10px; text-align: center; cursor: pointer; font-weight: bold;
+    }
+    .option-btn-label input { display: none; }
+    .option-btn-label:has(input:checked) {
+      background-color: var(--primary-color); color: white; border-color: var(--primary-color);
+    }
+    
+    /* 檢討與錯題簽名專區 */
+    .wrong-card {
+      background: #fff0f0; border: 1px solid #ffcdd2; padding: 15px; border-radius: 8px; margin-bottom: 15px;
+    }
+    .sig-canvas {
+      border: 2px dashed #999; background: #fff; width: 100%; height: 120px; border-radius: 6px; touch-action: none; cursor: crosshair;
+    }
+    .clear-sig-btn {
+      background: #888; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-top: 5px;
+    }
 
-    /* 彈窗樣式 */
+    /* 彈窗與 Loading */
     .custom-modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.5);
-      display: none; justify-content: center; align-items: center; z-index: 1000;
+      background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000;
     }
     .custom-modal-overlay.active { display: flex; }
-    .custom-modal {
-      background: white; padding: 20px; border-radius: 8px; max-width: 80%; width: 320px; text-align: center;
-    }
-    .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+    .custom-modal { background: white; padding: 20px; border-radius: 8px; max-width: 80%; width: 320px; text-align: center; }
     .modal-btn { margin-top: 15px; padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; }
-
-    /* Loading 遮罩 */
     .loading-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(255,255,255,0.8);
-      display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999;
+      background: rgba(255,255,255,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999;
     }
     .loading-overlay.hidden { display: none; }
     .spinner {
-      width: 40px; height: 40px; border: 4px solid #f3f3f3;
-      border-top: 4px solid var(--primary-color); border-radius: 50%;
-      animation: spin 1s linear infinite;
+      width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite;
     }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
@@ -92,86 +105,82 @@
 <body>
 
 <div class="container">
-  <h2>職業安全衛生測驗系統</h2>
+  <h2>職業安全衛生線上測驗</h2>
 
   <!-- 階段 1：填寫基本資料 -->
   <div id="step1" class="step-section active">
     <h3>階段 1：基本資料填寫</h3>
     <div class="form-group">
-      <label for="watchClass">是否已看過課程影片？</label>
+      <label for="classDate">上課日期 (必填)：</label>
+      <input type="date" id="classDate">
+    </div>
+    <div class="form-group">
+      <label for="department">部門名稱 (必填)：</label>
+      <input type="text" id="department" placeholder="請輸入部門名稱">
+    </div>
+    <div class="form-group">
+      <label for="userName">工號姓名 (必填)：</label>
+      <input type="text" id="userName" placeholder="範例：A12345 張小明">
+    </div>
+    <div class="form-group">
+      <label for="watchClass">是否已看過課程影片：</label>
       <select id="watchClass">
         <option value="">-- 請選擇 --</option>
         <option value="是">是</option>
         <option value="否">否</option>
       </select>
     </div>
-    <div class="form-group">
-      <label for="name">姓名：</label>
-      <input type="text" id="name" placeholder="請輸入姓名">
-    </div>
-    <div class="form-group">
-      <label for="phone">手機號碼：</label>
-      <input type="text" id="phone" placeholder="請輸入手機號碼">
-    </div>
-    <!-- 這裡對應 goToQuiz() 函式 -->
-    <button class="btn" onclick="goToQuiz()">下一步：開始測驗</button>
+    <button class="btn" onclick="startQuiz()">下一步：開始測驗</button>
   </div>
 
-  <!-- 階段 2：進行線上測驗 -->
+  <!-- 階段 2：進行 10 題線上測驗 -->
   <div id="step2" class="step-section">
-    <h3>階段 2：線上測驗</h3>
+    <h3>階段 2：線上測驗 (共 10 題)</h3>
     <div id="quizContainer"></div>
-    <button class="btn" onclick="goToStep3()">提交測驗並計算成績</button>
-  </div>
-
-  <!-- 階段 3：查看成績與檢討 -->
-  <div id="step3" class="step-section">
-    <h3>階段 3：測驗結果</h3>
-    <div id="scoreDisplay" style="font-size: 20px; font-weight: bold; margin-bottom: 15px;"></div>
-    <div id="reviewContainer"></div>
-    <button class="btn" onclick="goToStep4()">下一步：簽名確認</button>
-  </div>
-
-  <!-- 階段 4：手寫簽名確認 -->
-  <div id="step4" class="step-section">
-    <h3>階段 4：學員簽名</h3>
-    <p>請在上方欄位確認您的資料後完成簽名：</p>
-    <div style="border: 1px dashed #ccc; padding: 20px; text-align: center; background: #fafafa; margin-bottom: 15px;">
-      [ 簽名板區域 ]
+    <div class="form-group" style="margin-top: 20px;">
+      <label for="feedback">建議與疑問 (非必填)：</label>
+      <textarea id="feedback" rows="3" placeholder="若對題目或課程有疑問可在此填寫..."></textarea>
     </div>
-    <button class="btn" onclick="goToStep5()">完成簽名並上傳紀錄</button>
+    <button class="btn" onclick="submitQuiz()">提交測驗並計算成績</button>
   </div>
 
-  <!-- 階段 5：完成測驗 -->
-  <div id="step5" class="step-section">
-    <h3>階段 5：測驗完成</h3>
-    <p style="color: green; font-weight: bold; font-size: 18px;">恭喜您！您的測驗紀錄與簽名已成功儲存。</p>
+  <!-- 階段 3：測驗結果與錯題簽名 -->
+  <div id="step3" class="step-section">
+    <h3>階段 3：測驗結果與檢討</h3>
+    <div id="scoreDisplay" style="font-size: 20px; font-weight: bold; margin-bottom: 15px; color: var(--primary-color);"></div>
+    <div id="reviewContainer"></div>
+    <button class="btn" id="sigSubmitBtn" onclick="submitSignature()">完成簽名並送出紀錄</button>
+  </div>
+
+  <!-- 階段 4：完成 -->
+  <div id="step4" class="step-section">
+    <h3>測驗完成</h3>
+    <p style="color: var(--success-color); font-weight: bold; font-size: 18px;">恭喜您！您的測驗紀錄與確認簽名已成功寫入系統。</p>
     <p>感謝您的配合，您可以關閉此頁面。</p>
   </div>
 </div>
 
-<!-- 自定義警告彈窗 -->
+<!-- 彈窗與 Loading -->
 <div class="custom-modal-overlay" id="customModal">
   <div class="custom-modal">
-    <div class="modal-icon">⚠️</div>
     <div class="modal-title" id="modalTitle">提示</div>
     <div class="modal-message" id="modalText">說明訊息</div>
     <button class="modal-btn" onclick="closeModal()">我知道了</button>
   </div>
 </div>
 
-<!-- 載入中遮罩 -->
 <div id="loading" class="loading-overlay hidden">
   <div class="spinner"></div>
-  <p style="margin-top: 10px; font-weight: bold;">資料處理中，請稍候...</p>
+  <p style="margin-top: 10px; font-weight: bold;" id="loadingText">資料讀取中，請稍候...</p>
 </div>
 
 <script>
-  // Cloudflare Worker API 網址
   const API_URL = 'https://q826t01.ector-7af.workers.dev/';
 
-  let quizData = [];
-  let userAnswers = {};
+  let currentQuestions = []; // 存這 10 題
+  let userAnswers = [];      // 測驗者答案
+  let wrongItems = [];       // 錯題清單
+  let submittedRowIndex = null;
 
   function showCustomModal(msg, title = '提示') {
     document.getElementById('modalTitle').innerText = title;
@@ -183,8 +192,9 @@
     document.getElementById('customModal').classList.remove('active');
   }
 
-  function showLoading(show) {
+  function showLoading(show, text = '資料處理中，請稍候...') {
     const loading = document.getElementById('loading');
+    document.getElementById('loadingText').innerText = text;
     if (show) loading.classList.remove('hidden');
     else loading.classList.add('hidden');
   }
@@ -194,125 +204,265 @@
     document.getElementById('step' + toStep).classList.add('active');
   }
 
-  // 階段 1 -> 階段 2：驗證個人資料並從 Cloudflare Worker 載入題目
-  function goToQuiz() {
+  // 1. 驗證資料並從 Worker 撈選 10 題
+  function startQuiz() {
+    const classDate = document.getElementById('classDate').value;
+    const department = document.getElementById('department').value.trim();
+    const userName = document.getElementById('userName').value.trim();
     const watchClass = document.getElementById('watchClass').value;
-    const name = document.getElementById('name').value.trim();
-    const phone = document.getElementById('phone').value.trim();
 
+    if (!classDate || !department || !userName) {
+      showCustomModal('請完整填寫：上課日期、部門名稱與工號姓名！');
+      return;
+    }
     if (!watchClass) {
       showCustomModal('請選擇是否已看過課程影片');
       return;
     }
-    if (!name || !phone) {
-      showCustomModal('請填寫姓名與手機號碼');
-      return;
-    }
 
-    showLoading(true);
+    showLoading(true, '正在隨機抽出 10 道測驗題目...');
 
-    // 從 Worker 讀取 JSON 資料
-    fetch(API_URL, { method: 'GET' })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP 狀態碼：' + res.status);
-        return res.json();
-      })
+    fetch(API_URL + '?action=getQuestions')
+      .then(res => res.json())
       .then(data => {
         showLoading(false);
-        console.log('Worker API 資料:', data);
-
-        if (data && data.result === 'error') {
-          showCustomModal('載入題目失敗：' + data.message);
-          return;
+        if (Array.isArray(data) && data.length > 0) {
+          currentQuestions = data;
+          renderQuiz(data);
+          switchStep(1, 2);
+        } else {
+          showCustomModal('無法取得題目或題庫為空，請檢查「設計測驗題庫」工作表');
         }
-
-        if (!Array.isArray(data)) {
-          showCustomModal('題目資料格式不正確');
-          return;
-        }
-
-        renderQuiz(data);
       })
       .catch(err => {
         showLoading(false);
-        console.error('Fetch 錯誤:', err);
-        showCustomModal('網路連線失敗或後端回應異常：' + err.message);
+        showCustomModal('載入題目失敗：' + err.message);
       });
   }
 
-  function renderQuiz(data) {
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      showCustomModal('目前沒有可用的測驗題目');
-      return;
-    }
-
-    quizData = data;
+  // 渲染 10 題與 A,B,C,D 選項按鈕
+  function renderQuiz(questions) {
     const container = document.getElementById('quizContainer');
     container.innerHTML = '';
 
-    data.forEach((q, index) => {
-      const qNum = index + 1;
-      const options = [q.optionA, q.optionB, q.optionC, q.optionD].filter(Boolean);
-      let optionsHtml = '';
-
-      options.forEach((opt, optIndex) => {
-        optionsHtml += `
-          <label class="option-label">
-            <input type="radio" name="question_${qNum}" value="${optIndex + 1}">
-            <span>${opt}</span>
-          </label>
-        `;
-      });
-
+    questions.forEach((q, idx) => {
+      const qIndex = idx + 1;
       container.innerHTML += `
-        <div class="question-card" id="q_card_${qNum}">
-          <div class="question-title">${qNum}. ${q.question}</div>
-          <div class="options-group">${optionsHtml}</div>
+        <div class="question-card">
+          <div class="question-title">第 ${qIndex} 題：${q.question}</div>
+          <div class="options-group">
+            <label class="option-btn-label"><input type="radio" name="q_${qIndex}" value="A"> A </label>
+            <label class="option-btn-label"><input type="radio" name="q_${qIndex}" value="B"> B </label>
+            <label class="option-btn-label"><input type="radio" name="q_${qIndex}" value="C"> C </label>
+            <label class="option-btn-label"><input type="radio" name="q_${qIndex}" value="D"> D </label>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // 2. 提交測驗 (寫入 A~J 欄)
+  function submitQuiz() {
+    userAnswers = [];
+    wrongItems = [];
+    let correctCount = 0;
+
+    for (let i = 1; i <= currentQuestions.length; i++) {
+      const selected = document.querySelector(`input[name="q_${i}"]:checked`);
+      if (!selected) {
+        showCustomModal(`請回答第 ${i} 題！`);
+        return;
+      }
+      const uAns = selected.value;
+      userAnswers.push(uAns);
+
+      const qObj = currentQuestions[i - 1];
+      if (uAns === qObj.answer) {
+        correctCount++;
+      } else {
+        wrongItems.push({
+          quizNum: i,              // 這次測驗的第幾題 (1~10)
+          bankId: qObj.bankId,     // 題庫真正的題號
+          userAns: uAns,           // 錯答
+          correctAns: qObj.answer, // 正解
+          question: qObj.question
+        });
+      }
+    }
+
+    // 計算答對比例與分數
+    const accuracy = (correctCount / currentQuestions.length) * 100;
+    const accuracyStr = accuracy.toFixed(1) + "%";
+    const score = Math.round(accuracy);
+
+    // 格式化日期：YYYY/MM/DD
+    const rawDate = document.getElementById('classDate').value;
+    const formattedClassDate = rawDate.replace(/-/g, '/');
+
+    const payload = {
+      action: 'submitQuiz',
+      classDate: formattedClassDate,
+      department: document.getElementById('department').value.trim(),
+      userName: document.getElementById('userName').value.trim(),
+      bankIds: currentQuestions.map(q => q.bankId),
+      correctAnswers: currentQuestions.map(q => q.answer),
+      userAnswers: userAnswers,
+      accuracyStr: accuracyStr,
+      score: score,
+      feedback: document.getElementById('feedback').value.trim()
+    };
+
+    showLoading(true, '正在提交測驗答案...');
+
+    fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(resData => {
+      showLoading(false);
+      if (resData.status === 'success') {
+        submittedRowIndex = resData.rowIndex;
+        renderReviewSection(score, accuracyStr);
+        switchStep(2, 3);
+      } else {
+        showCustomModal('寫入失敗：' + resData.message);
+      }
+    })
+    .catch(err => {
+      showLoading(false);
+      showCustomModal('網路錯誤：' + err.message);
+    });
+  }
+
+  // 3. 渲染檢討與錯題簽名區域
+  function renderReviewSection(score, accuracyStr) {
+    document.getElementById('scoreDisplay').innerText = `您的測驗得分：${score} 分 (答對率：${accuracyStr})`;
+    const container = document.getElementById('reviewContainer');
+    container.innerHTML = '';
+
+    if (wrongItems.length === 0) {
+      container.innerHTML = `<p style="color:var(--success-color); font-weight:bold;">恭喜您全對！無需進行錯題簽名。</p>`;
+      document.getElementById('sigSubmitBtn').innerText = "確認送出";
+      return;
+    }
+
+    const userName = document.getElementById('userName').value.trim();
+    let html = `<p style="color:var(--error-color); font-weight:bold;">您有 ${wrongItems.length} 題答錯。請針對下列錯題進行檢討，並於每題下方逐條簽上您的完整工號姓名「${userName}」以示確認：</p>`;
+
+    wrongItems.forEach((item, index) => {
+      html += `
+        <div class="wrong-card">
+          <p><strong>錯題 ${index + 1} (測驗第 ${item.quizNum} 題 / 題庫第 ${item.bankId} 題)：</strong></p>
+          <p style="white-space: pre-line;">${item.question}</p>
+          <p style="color:var(--error-color)">您的回答：${item.userAns} ❌ ｜ 正確答案：${item.correctAns}  </p>
+          <label style="margin-top:10px;">請簽寫「${userName}」：</label>
+          <canvas id="canvas_${index}" class="sig-canvas"></canvas>
+          <button class="clear-sig-btn" onclick="clearCanvas(${index})">清除重簽</button>
         </div>
       `;
     });
 
-    switchStep(1, 2);
+    container.innerHTML = html;
+    setTimeout(initCanvases, 100); // 綁定 Canvas 事件
   }
 
-  // 階段 2 -> 階段 3：計算成績與顯示檢討
-  function goToStep3() {
-    let totalQuestions = quizData.length;
+  // 初始化手寫簽名板 (支援觸控與滑鼠)
+  let canvasContexts = [];
+  function initCanvases() {
+    canvasContexts = [];
+    wrongItems.forEach((_, idx) => {
+      const cvs = document.getElementById(`canvas_${idx}`);
+      if (!cvs) return;
+      
+      // 調整實際解析度
+      cvs.width = cvs.offsetWidth;
+      cvs.height = cvs.offsetHeight;
+      const ctx = cvs.getContext('2d');
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#000';
+      canvasContexts[idx] = { cvs, ctx, isSigned: false };
 
-    for (let i = 1; i <= totalQuestions; i++) {
-      const selected = document.querySelector(`input[name="question_${i}"]:checked`);
-      if (!selected) {
-        showCustomModal(`請回答第 ${i} 題`);
-        return;
+      let drawing = false;
+
+      function startDraw(e) {
+        drawing = true;
+        canvasContexts[idx].isSigned = true;
+        ctx.beginPath();
+        const pos = getPos(e, cvs);
+        ctx.moveTo(pos.x, pos.y);
       }
-      userAnswers[i] = parseInt(selected.value);
+      function moveDraw(e) {
+        if (!drawing) return;
+        const pos = getPos(e, cvs);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+      }
+      function endDraw() { drawing = false; }
+
+      cvs.addEventListener('mousedown', startDraw);
+      cvs.addEventListener('mousemove', moveDraw);
+      cvs.addEventListener('mouseup', endDraw);
+
+      cvs.addEventListener('touchstart', (e) => { startDraw(e.touches[0]); e.preventDefault(); });
+      cvs.addEventListener('touchmove', (e) => { moveDraw(e.touches[0]); e.preventDefault(); });
+      cvs.addEventListener('touchend', endDraw);
+    });
+  }
+
+  function getPos(e, cvs) {
+    const rect = cvs.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function clearCanvas(idx) {
+    const item = canvasContexts[idx];
+    if (item) {
+      item.ctx.clearRect(0, 0, item.cvs.width, item.cvs.height);
+      item.isSigned = false;
+    }
+  }
+
+  // 4. 提交簽名 (寫入 K~L 欄)
+  function submitSignature() {
+    if (wrongItems.length > 0) {
+      for (let i = 0; i < wrongItems.length; i++) {
+        if (!canvasContexts[i] || !canvasContexts[i].isSigned) {
+          showCustomModal(`請完成第 ${i + 1} 道錯題的確認簽名！`);
+          return;
+        }
+      }
     }
 
-    let reviewHtml = '';
-    quizData.forEach((q, index) => {
-      const qNum = index + 1;
-      const uAns = userAnswers[qNum];
-      reviewHtml += `<p>第 ${qNum} 題您的回答為選項 ${uAns}</p>`;
+    // 格式化：38(B->C)..測驗[5],12(A->D)..測驗[7]
+    const signatureLogArr = wrongItems.map(item => {
+      return `${item.bankId}(${item.userAns}->${item.correctAns})..測驗[${item.quizNum}]`;
     });
+    const signatureLogStr = signatureLogArr.join(',');
 
-    document.getElementById('scoreDisplay').innerText = `您的測驗結果已算完成！`;
-    document.getElementById('reviewContainer').innerHTML = reviewHtml;
+    showLoading(true, '正在寫入確認簽名紀錄...');
 
-    switchStep(2, 3);
-  }
-
-  // 階段 3 -> 階段 4：進入簽名頁面
-  function goToStep4() {
-    switchStep(3, 4);
-  }
-
-  // 階段 4 -> 階段 5：完成並送出
-  function goToStep5() {
-    showLoading(true);
-    setTimeout(() => {
+    fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'submitSignature',
+        rowIndex: submittedRowIndex,
+        signatureLog: signatureLogStr
+      })
+    })
+    .then(res => res.json())
+    .then(resData => {
       showLoading(false);
-      switchStep(4, 5);
-    }, 1000);
+      if (resData.status === 'success') {
+        switchStep(3, 4);
+      } else {
+        showCustomModal('簽名提交失敗：' + resData.message);
+      }
+    })
+    .catch(err => {
+      showLoading(false);
+      showCustomModal('網路錯誤：' + err.message);
+    });
   }
 </script>
 
