@@ -3,187 +3,147 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>職安衛測驗網頁</title>
+  <title>職業安全衛生線上測驗</title>
   <style>
     :root {
-      --primary-color: #0d6efd;
-      --success-color: #198754;
-      --danger-color: #dc3545;
-      --bg-color: #f8f9fa;
+      --primary-color: #0056b3;
+      --bg-color: #f4f7f6;
       --card-bg: #ffffff;
-      --text-color: #333333;
+      --text-color: #333;
     }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-      padding: 20px; 
-      line-height: 1.6; 
-      background-color: var(--bg-color); 
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-color);
       color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
     }
-    .container { 
-      max-width: 700px; 
-      margin: auto; 
-      background: var(--card-bg); 
-      padding: 40px; 
-      border-radius: 12px; 
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+    .container {
+      width: 100%;
+      max-width: 600px;
+      background: var(--card-bg);
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
-    h2, h3 { text-align: center; color: #2c3e50; }
-    .hidden { display: none; }
-    .form-group { margin-bottom: 20px; }
-    label { display: block; margin-bottom: 8px; font-weight: 600; color: #495057; }
-    input[type="text"], input[type="date"], select, textarea { 
-      width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 6px; box-sizing: border-box; font-size: 16px; transition: border-color 0.2s;
+    .step-section { display: none; }
+    .step-section.active { display: block; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input[type="text"], select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
     }
-    input[type="text"]:focus, input[type="date"]:focus, select:focus, textarea:focus {
-      border-color: var(--primary-color);
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+    button.btn {
+      width: 100%;
+      padding: 12px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
     }
-    button { 
-      display: block; width: 100%; padding: 14px; background-color: var(--success-color); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; margin-top: 25px; transition: background-color 0.2s;
+    button.btn:hover { opacity: 0.9; }
+    .question-card {
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      border-left: 4px solid var(--primary-color);
     }
-    button:hover { background-color: #157347; }
-    button:disabled { background-color: #6c757d; cursor: not-allowed; }
-    .btn-primary { background-color: var(--primary-color); }
-    .btn-primary:hover { background-color: #0b5ed7; }
-    .question { margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
-    .question p { font-weight: 600; font-size: 17px; }
-    .options label { display: inline-block; margin-right: 15px; font-weight: normal; cursor: pointer; }
-    
-    .result-header { text-align: center; background: #e8f4fd; padding: 20px; border-radius: 8px; margin-bottom: 25px; }
-    .result-score { font-size: 28px; font-weight: bold; color: var(--primary-color); margin-top: 5px; }
-    .error-card { background: #fff5f5; border-left: 5px solid var(--danger-color); padding: 15px; margin-bottom: 20px; border-radius: 4px; }
-    .error-title { font-weight: bold; color: #212529; margin-bottom: 8px; }
-    .correct-ans { color: var(--danger-color); font-weight: bold; margin-bottom: 4px; }
-    .user-ans { color: #0d6efd; font-size: 13px; margin-bottom: 10px; }
-    .sign-sub-box { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #f5c2c7; }
-    .thank-you { text-align: center; padding: 40px 0; }
-    .thank-you h2 { color: var(--success-color); font-size: 32px; margin-bottom: 15px; }
-    .verified-badge { color: var(--success-color); font-weight: bold; margin-top: 5px; }
+    .question-title { font-weight: bold; margin-bottom: 10px; }
+    .option-label { display: block; margin: 8px 0; cursor: pointer; }
 
+    /* 彈窗樣式 */
     .custom-modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center;
-      z-index: 1000; opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
+      background: rgba(0,0,0,0.5);
+      display: none; justify-content: center; align-items: center; z-index: 1000;
     }
-    .custom-modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .custom-modal-overlay.active { display: flex; }
     .custom-modal {
-      background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px;
-      text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-      transform: translateY(-20px); transition: transform 0.3s ease;
+      background: white; padding: 20px; border-radius: 8px; max-width: 80%; width: 300px; text-align: center;
     }
-    .custom-modal-overlay.active .custom-modal { transform: translateY(0); }
-    .modal-icon { font-size: 48px; color: var(--danger-color); margin-bottom: 10px; }
-    .modal-title { font-size: 20px; font-weight: bold; color: #212529; margin-bottom: 10px; }
-    .modal-message { font-size: 15px; color: #6c757d; margin-bottom: 20px; line-height: 1.5; }
-    .modal-btn { background-color: var(--danger-color); width: 100%; padding: 10px; font-size: 16px; margin-top: 0; }
-    .modal-btn:hover { background-color: #bb2d3b; }
+    .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+    .modal-btn { margin-top: 15px; padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; }
+
+    /* Loading 遮罩 */
+    .loading-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255,255,255,0.8);
+      display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999;
+    }
+    .loading-overlay.hidden { display: none; }
+    .spinner {
+      width: 40px; height: 40px; border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--primary-color); border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-<div class="container" id="app">
-  <h2>職安衛測驗網頁</h2>
-  
-  <!-- 步驟 1：基本資料 -->
-  <div id="step1">
+<div class="container">
+  <h2>職業安全衛生測驗系統</h2>
+
+  <!-- Step 1: 填寫基本資料 -->
+  <div id="step1" class="step-section active">
     <div class="form-group">
-      <label>上課日期：</label><input type="date" id="date" required>
-    </div>
-    <div class="form-group">
-      <label>填寫者部門：</label><input type="text" id="dept" required>
-    </div>
-    <div class="form-group">
-      <label>填寫者姓名：</label><input type="text" id="name" required>
-    </div>
-    <div class="form-group">
-      <label>是否已經看完課程再進行此測驗？</label>
-      <select id="courseCheck" required>
-        <option value="">請選擇</option>
-        <option value="yes">是</option>
-        <option value="no">否</option>
+      <label for="watchClass">是否已看過課程影片？</label>
+      <select id="watchClass">
+        <option value="">-- 請選擇 --</option>
+        <option value="是">是</option>
+        <option value="否">否</option>
       </select>
     </div>
-    <button id="btnStep1" class="btn-primary" onclick="goToQuiz()">下一步</button>
+    <div class="form-group">
+      <label for="name">姓名：</label>
+      <input type="text" id="name" placeholder="請輸入姓名">
+    </div>
+    <div class="form-group">
+      <label for="phone">手機號碼：</label>
+      <input type="text" id="phone" placeholder="請輸入手機號碼">
+    </div>
+    <button class="btn" onclick="goToQuiz()">開始測驗</button>
   </div>
 
-  <!-- 步驟 2：進行測驗 -->
-  <div id="step2" class="hidden">
+  <!-- Step 2: 測驗題目區塊 -->
+  <div id="step2" class="step-section">
     <div id="quizContainer"></div>
-    <button class="btn-primary" onclick="goToFeedback()">下一步</button>
-  </div>
-
-  <!-- 步驟 3：意見回饋與初次提交 -->
-  <div id="step3" class="hidden">
-    <div class="form-group">
-      <label>是否對上課有建議與疑問？</label>
-      <select id="feedbackCheck" onchange="toggleFeedback()" required>
-        <option value="無">無</option>
-        <option value="有">有</option>
-      </select>
-    </div>
-    <div id="feedbackArea" class="hidden form-group">
-      <textarea id="feedbackText" placeholder="請輸入您的建議..."></textarea>
-    </div>
-    <button id="btnSubmitQuiz" onclick="submitQuiz()">提交並評分</button>
-  </div>
-
-  <!-- 步驟 4：成績與錯題簽名 -->
-  <div id="step4" class="hidden">
-    <div class="result-header">
-      <div>測驗結果</div>
-      <div class="result-score" id="scoreDisplay"></div>
-    </div>
-    <div id="errorContainer"></div>
-    <button id="finalSubmitBtn" class="hidden" onclick="completeSubmission()">確認無誤，最終提交</button>
-  </div>
-
-  <!-- 步驟 5：完成 -->
-  <div id="step5" class="hidden">
-    <div class="thank-you">
-      <h2>🎉 感謝您的填寫與配合！</h2>
-      <p>您的測驗結果與簽名已成功記錄。</p>
-      <button class="btn-primary" onclick="resetForm()">返回首頁</button>
-    </div>
+    <button class="btn" onclick="submitQuiz()">提交答案</button>
   </div>
 </div>
 
-<!-- 彈出視窗 -->
+<!-- 自定義警告彈窗 (修正 modalTitle id) -->
 <div class="custom-modal-overlay" id="customModal">
   <div class="custom-modal">
     <div class="modal-icon">⚠️</div>
     <div class="modal-title" id="modalTitle">警告</div>
-    <div class="modal-message" id="modalText">輸入的姓名必須與填寫者姓名完全一致。</div>
+    <div class="modal-message" id="modalText">說明訊息</div>
     <button class="modal-btn" onclick="closeModal()">我知道了</button>
   </div>
 </div>
 
+<!-- 載入中遮罩 -->
+<div id="loading" class="loading-overlay hidden">
+  <div class="spinner"></div>
+  <p style="margin-top: 10px; font-weight: bold;">資料載入中，請稍候...</p>
+</div>
+
 <script>
-  // ⚠️ 請修改為您真實部署的 Cloudflare Worker 網址
-  const WORKER_URL = "https://q826t01.ector-7af.workers.dev";
+  // 請更換為你的 Cloudflare Worker 或 GAS Web App URL
+  const API_URL = 'https://YOUR_WORKER_DOMAIN.workers.dev/'; 
 
-  let questions = [];
-  let errorQuestions = [];
-  let cachedFormData = null;
-  let verifiedStatus = {}; 
-  let confirmDetailsList = [];
-
-  // 通用 API 發送函式
-  async function callWorkerApi(action, data = null) {
-    const response = await fetch(WORKER_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: action, data: data })
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return await response.json();
-  }
-
-  function showCustomModal(msg) {
+  function showCustomModal(msg, title = '提示') {
+    document.getElementById('modalTitle').innerText = title;
     document.getElementById('modalText').innerText = msg;
     document.getElementById('customModal').classList.add('active');
   }
@@ -192,227 +152,94 @@
     document.getElementById('customModal').classList.remove('active');
   }
 
-  // 1. 取得題目 (步驟 1 -> 2)
-  async function goToQuiz() {
-    if(document.getElementById('courseCheck').value === 'no') {
-      showCustomModal('請先上完課再填寫！'); return;
+  function showLoading(show) {
+    const loading = document.getElementById('loading');
+    if (show) loading.classList.remove('hidden');
+    else loading.classList.add('hidden');
+  }
+
+  function goToQuiz() {
+    const watchClass = document.getElementById('watchClass').value;
+    const name = document.getElementById('name').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+
+    if (!watchClass) {
+      showCustomModal('請選擇是否已看過課程影片');
+      return;
     }
-    if(!document.getElementById('date').value || !document.getElementById('dept').value || !document.getElementById('name').value) {
-      showCustomModal('請填寫所有必填欄位！'); return;
-    }
-
-    const btn = document.getElementById('btnStep1');
-    btn.disabled = true;
-    btn.innerText = "載入題目中...";
-
-    try {
-      const data = await callWorkerApi("getQuestions");
-      showQuiz(data);
-    } catch (err) {
-      console.error(err);
-      showCustomModal("網路連線失敗或後端錯誤，無法取得題目，請重新嘗試！");
-    } finally {
-      btn.disabled = false;
-      btn.innerText = "下一步";
-    }
-  }
-
-  function showQuiz(data) {
-    questions = data;
-    let html = "";
-    data.forEach((q, index) => {
-      html += `<div class="question">
-        <p>${index + 1}. ${q[2]}</p>
-        <div class="options">
-          <label><input type="radio" name="q${index}" value="A"> A</label>
-          <label><input type="radio" name="q${index}" value="B"> B</label>
-          <label><input type="radio" name="q${index}" value="C"> C</label>
-          <label><input type="radio" name="q${index}" value="D"> D</label>
-        </div>
-      </div>`;
-    });
-    document.getElementById('quizContainer').innerHTML = html;
-    document.getElementById('step1').classList.add('hidden');
-    document.getElementById('step2').classList.remove('hidden');
-  }
-
-  function toggleFeedback() {
-    document.getElementById('feedbackArea').classList.toggle('hidden', document.getElementById('feedbackCheck').value === '無');
-  }
-
-  function goToFeedback() {
-    for(let i=0; i<questions.length; i++) {
-      if(!document.querySelector(`input[name="q${i}"]:checked`)) {
-        showCustomModal(`還有第 ${i+1} 題尚未作答！`); return;
-      }
-    }
-    document.getElementById('step2').classList.add('hidden');
-    document.getElementById('step3').classList.remove('hidden');
-  }
-
-  // 2. 第一次提交評分（寫入 A ~ J 欄）
-  async function submitQuiz() {
-    let correctCount = 0;
-    let userAnswers = [];
-    errorQuestions = [];
-    verifiedStatus = {};
-    confirmDetailsList = [];
-
-    questions.forEach((q, index) => {
-      let selected = document.querySelector(`input[name="q${index}"]:checked`);
-      let ans = selected ? selected.value : "";
-      userAnswers.push(ans);
-      if(ans === q[1]) {
-        correctCount++;
-      } else {
-        errorQuestions.push({
-          id: index,
-          originalId: q[0],        
-          testIndex: index + 1,    
-          content: q[2],
-          correct: q[1],
-          user: ans || "未作答"
-        });
-        verifiedStatus[index] = false; 
-      }
-    });
-
-    let score = (correctCount / 10) * 100;
-    let userName = document.getElementById('name').value;
-
-    cachedFormData = {
-      date: document.getElementById('date').value,
-      dept: document.getElementById('dept').value,
-      name: userName,
-      questionIds: questions.map(q => q[0]).join(','),
-      correctAnswers: questions.map(q => q[1]).join(','),
-      userAnswers: userAnswers.join(','),
-      correctCount: correctCount,
-      feedback: document.getElementById('feedbackCheck').value === '有' ? document.getElementById('feedbackText').value : '無'
-    };
-
-    const btn = document.getElementById('btnSubmitQuiz');
-    btn.disabled = true;
-    btn.innerText = "提交計算中...";
-
-    try {
-      // 呼叫 API 寫入 A~J 欄
-      await callWorkerApi("submitInitialForm", cachedFormData);
-      console.log("初次成績已寫入 A~J 欄");
-
-      document.getElementById('step3').classList.add('hidden');
-      document.getElementById('step4').classList.remove('hidden');
-      document.getElementById('scoreDisplay').innerText = `${userName}：${score} 分 (${correctCount}/10題)`;
-
-      if (score === 100) {
-        cachedFormData.confirmDetails = "無（全對無錯題）";
-        await callWorkerApi("submitFinalConfirmation", cachedFormData);
-        console.log("100分確認紀錄已寫入 K~L 欄");
-
-        document.getElementById('errorContainer').innerHTML = `<p style="text-align:center; color:var(--success-color); font-weight:bold;">太棒了！全部答對，無需修正！</p>`;
-        document.getElementById('finalSubmitBtn').classList.remove('hidden');
-      } else {
-        renderErrors();
-      }
-    } catch (err) {
-      console.error(err);
-      showCustomModal("提交成績失敗，請檢查網路後重新嘗試！");
-    } finally {
-      btn.disabled = false;
-      btn.innerText = "提交並評分";
-    }
-  }
-
-  function renderErrors() {
-    let errorHtml = "<h3>⚠️ 錯誤題目與個別確認</h3>";
-    errorQuestions.forEach((eq) => {
-      errorHtml += `<div class="error-card" id="card_${eq.id}">
-        <div class="error-title">測驗題號 ${eq.testIndex}：${eq.content}</div>
-        <div class="correct-ans">正確答案：${eq.correct}</div>
-        <div class="user-ans" style="color:var(--primary-color); font-size:14px;">您的錯誤答案：${eq.user}</div>
-        <div class="sign-sub-box" id="signBox_${eq.id}">
-          <label style="font-size:14px; font-weight:normal; margin-bottom:4px;">我已確認修正後的答案，並且簽名以示負責！</label>
-          <div style="display: flex; gap: 10px;">
-            <input type="text" id="signInput_${eq.id}" placeholder="請輸入填寫者姓名" style="flex: 1; padding: 8px;">
-            <button type="button" class="btn-primary" style="margin-top:0; padding: 8px 16px; width: auto;" onclick="verifySingleSign(${eq.id}, '${eq.originalId}', '${eq.user}', '${eq.correct}', ${eq.testIndex})">確認簽名</button>
-          </div>
-        </div>
-      </div>`;
-    });
-    document.getElementById('errorContainer').innerHTML = errorHtml;
-  }
-
-  function verifySingleSign(id, originalId, userAns, correctAns, testIndex) {
-    let inputVal = document.getElementById(`signInput_${id}`).value.trim();
-    let expectedName = cachedFormData.name;
-
-    if (inputVal !== expectedName) {
-      showCustomModal(`簽名失敗！\n輸入的姓名必須與填寫者姓名「${expectedName}」完全一致。`);
+    if (!name || !phone) {
+      showCustomModal('請填寫姓名與手機號碼');
       return;
     }
 
-    verifiedStatus[id] = true;
-    let detailStr = `${originalId}(${userAns}->${correctAns})..測驗[${testIndex}]`;
-    confirmDetailsList.push(detailStr);
+    showLoading(true);
 
-    let signBox = document.getElementById(`signBox_${id}`);
-    signBox.innerHTML = `<div class="verified-badge">✅ 已完成確認簽名（簽名人：${expectedName}）</div>`;
+    fetch(API_URL)
+      .then(res => res.json())
+      .then(data => {
+        showLoading(false);
+        console.log('API 回傳原始資料:', data);
 
-    checkAllVerified();
+        // 檢查後端自訂錯誤格式
+        if (data && data.result === 'error') {
+          showCustomModal('取得題目失敗：' + data.message);
+          return;
+        }
+
+        // 檢查資料是否為陣列，防止 data.forEach is not a function 錯誤
+        if (!Array.isArray(data)) {
+          showCustomModal('題目資料格式不正確，回傳內容非陣列');
+          return;
+        }
+
+        showQuiz(data);
+      })
+      .catch(err => {
+        showLoading(false);
+        console.error('Fetch Error:', err);
+        showCustomModal('網路連線失敗或後端回應異常：' + err.message);
+      });
   }
 
-  async function checkAllVerified() {
-    let allDone = true;
-    for (let id in verifiedStatus) {
-      if (!verifiedStatus[id]) {
-        allDone = false;
-        break;
-      }
+  function showQuiz(data) {
+    if (!data || data.length === 0) {
+      showCustomModal('目前沒有可用的測驗題目');
+      return;
     }
 
-    if (allDone && errorQuestions.length > 0) {
-      cachedFormData.confirmDetails = confirmDetailsList.join(', ');
+    document.getElementById('step1').classList.remove('active');
+    document.getElementById('step2').classList.add('active');
 
-      try {
-        await callWorkerApi("submitFinalConfirmation", cachedFormData);
-        console.log("錯題確認時間與明細已成功寫入 K~L 欄");
-        document.getElementById('finalSubmitBtn').classList.remove('hidden');
-      } catch (err) {
-        console.error(err);
-        showCustomModal("簽名確認紀錄寫入失敗，請檢查網路連線！");
-      }
-    }
+    const container = document.getElementById('quizContainer');
+    container.innerHTML = '';
+
+    data.forEach((q, index) => {
+      const qNum = index + 1;
+      let optionsHtml = '';
+      const options = [q.optionA, q.optionB, q.optionC, q.optionD].filter(Boolean);
+
+      options.forEach((opt, optIndex) => {
+        optionsHtml += `
+          <label class="option-label">
+            <input type="radio" name="question_${qNum}" value="${optIndex + 1}">
+            <span>${opt}</span>
+          </label>
+        `;
+      });
+
+      container.innerHTML += `
+        <div class="question-card" id="q_card_${qNum}">
+          <div class="question-title">${qNum}. ${q.question}</div>
+          <div class="options-group">${optionsHtml}</div>
+        </div>
+      `;
+    });
   }
 
-  function completeSubmission() {
-    document.getElementById('step4').classList.add('hidden');
-    document.getElementById('step5').classList.remove('hidden');
-  }
-
-  function resetForm() {
-    document.getElementById('date').value = '';
-    document.getElementById('dept').value = '';
-    document.getElementById('name').value = '';
-    document.getElementById('courseCheck').value = '';
-    document.getElementById('feedbackCheck').value = '無';
-    document.getElementById('feedbackText').value = '';
-    document.getElementById('feedbackArea').classList.add('hidden');
-    document.getElementById('finalSubmitBtn').classList.add('hidden');
-    
-    document.getElementById('step5').classList.add('hidden');
-    document.getElementById('step1').classList.remove('hidden');
-    document.getElementById('quizContainer').innerHTML = '';
-    document.getElementById('errorContainer').innerHTML = '';
-    cachedFormData = null;
-    errorQuestions = [];
-    verifiedStatus = {};
-    confirmDetailsList = [];
+  function submitQuiz() {
+    showCustomModal('測驗已提交！', '成功');
   }
 </script>
-  <!-- 載入中遮罩 -->
-<div id="loading" class="loading-overlay hidden">
-  <div class="spinner"></div>
-  <p style="margin-top: 10px; font-weight: bold;">資料處理中，請稍候...</p>
-</div>
+
 </body>
 </html>
