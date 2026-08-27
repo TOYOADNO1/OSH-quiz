@@ -56,7 +56,6 @@
     }
     button.btn:hover { opacity: 0.9; }
     
-    /* 題目卡片與選項卡片卡片化 */
     .question-card {
       background: #f9f9f9;
       padding: 18px;
@@ -105,7 +104,6 @@
       font-weight: bold;
     }
     
-    /* 錯題檢討區 */
     .wrong-card {
       background: #fff0f0;
       border: 1px solid #ffcdd2;
@@ -133,7 +131,6 @@
       margin-top: 5px;
     }
 
-    /* 彈窗與 Loading */
     .custom-modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000;
@@ -290,44 +287,51 @@
       });
   }
 
-  // 專門針對有換行結構 C 欄進行清理與精準拆解的函式
-  function parseQuestionContent(rawText) {
-    if (!rawText) return { mainQuestion: '題目無內容', options: { A:'(A)', B:'(B)', C:'(C)', D:'(D)' } };
-
-    let text = rawText.toString().trim();
+  // 萬用防護型拆解邏輯
+  function parseQuestionContent(qObj) {
+    // 相容各種 Worker 欄位命名
+    let rawText = qObj.question || qObj.questionContent || qObj.content || qObj.title || '';
     
-    // 1. 統一全半形括號
-    text = text.replace(/（/g, '(').replace(/）/g, ')');
+    if (typeof rawText !== 'string') {
+      rawText = JSON.stringify(rawText);
+    }
 
-    // 2. 尋找第一個 (A) 或 (a) 的位置
+    // 替換全形括號與常見換行符號
+    let text = rawText.replace(/（/g, '(').replace(/）/g, ')').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+
+    // 尋找第一個 (A) 或 (a)
     const matchA = text.match(/\([Aa]\)/);
 
     if (!matchA) {
       return {
-        mainQuestion: text.replace(/\n+/g, ' '),
-        options: { A: '(A)', B: '(B)', C: '(C)', D: '(D)' }
+        mainQuestion: text,
+        options: { A: '(A) 選項 A', B: '(B) 選項 B', C: '(C) 選項 C', D: '(D) 選項 D' }
       };
     }
 
-    // 3. 截取題目主要內容（去掉內部多餘換行）
+    // 截取題目主要文字
     const mainQuestion = text.substring(0, matchA.index).replace(/\n+/g, ' ').trim();
     const optionsBlock = text.substring(matchA.index);
 
-    // 4. 正則精準切分 (A)、(B)、(C)、(D)
+    // 切分 A, B, C, D 區塊
     const regex = /\(([A-Da-d])\)\s*([\s\S]*?)(?=\([A-Da-d]\)|$)/g;
     let match;
-    const opts = { A: '(A)', B: '(B)', C: '(C)', D: '(D)' };
+    const opts = {};
 
     while ((match = regex.exec(optionsBlock)) !== null) {
       const key = match[1].toUpperCase();
-      // 將選項文字內多餘的換行清掉
       const val = match[2].replace(/\n+/g, ' ').trim();
       opts[key] = `(${key}) ${val}`;
     }
 
     return {
-      mainQuestion: mainQuestion,
-      options: opts
+      mainQuestion: mainQuestion || '題目內容',
+      options: {
+        A: opts.A || '(A)',
+        B: opts.B || '(B)',
+        C: opts.C || '(C)',
+        D: opts.D || '(D)'
+      }
     };
   }
 
@@ -337,7 +341,7 @@
 
     questions.forEach((q, idx) => {
       const qIndex = idx + 1;
-      const parsed = parseQuestionContent(q.question);
+      const parsed = parseQuestionContent(q);
       
       q.cleanQuestion = parsed.mainQuestion;
 
@@ -351,7 +355,7 @@
             </label>
             <label class="option-btn-label">
               <input type="radio" name="q_${qIndex}" value="B">
-              <span >${parsed.options.B}</span>
+              <span>${parsed.options.B}</span>
             </label>
             <label class="option-btn-label">
               <input type="radio" name="q_${qIndex}" value="C">
