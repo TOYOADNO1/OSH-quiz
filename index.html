@@ -418,11 +418,11 @@
         const correctAnsText = (qObj.parsedOptions && qObj.parsedOptions[qObj.answer]) ? qObj.parsedOptions[qObj.answer] : qObj.answer;
 
         wrongItems.push({
-          quizNum: i,                 // 這次隨機測驗的題號 (例如：5)
+          quizNum: i,                 // 隨機測驗題號 (例如：5)
           bankId: qObj.bankId,       // 題庫題號 (例如：38)
-          userAns: uAns,             // 測驗者錯答 (例如：B)
+          userAns: uAns,             // 錯答 (例如：B)
           userAnsText: userAnsText,
-          correctAns: qObj.answer,    // 題庫正確答案 (例如：C)
+          correctAns: qObj.answer,    // 正確答案 (例如：C)
           correctAnsText: correctAnsText,
           question: qObj.cleanQuestion || qObj.question
         });
@@ -565,10 +565,9 @@
     }
   }
 
-  // 擷取姓名關鍵字 (移除開頭英數字工號與空白)
+  // 萃取姓名關鍵字（過濾英數字工號）
   function extractNameKey(fullInput) {
     if (!fullInput) return '';
-    // 去除開頭英文與數字 (例如 A12345 -> 留張小明，若無工號則直接取完整文字)
     let clean = fullInput.replace(/^[A-Za-z0-9_\-\s]+/, '').trim();
     return clean || fullInput.trim();
   }
@@ -577,7 +576,7 @@
     const originalUserName = document.getElementById('userName').value.trim();
     const nameKey = extractNameKey(originalUserName);
 
-    // 1. 檢核與組合錯題確認字串
+    // 1. 檢核與構建目標格式字串
     let formatSegments = [];
     if (wrongItems.length > 0) {
       for (let i = 0; i < wrongItems.length; i++) {
@@ -588,19 +587,18 @@
           return;
         }
 
-        // 檢查是否包含階段 1 的「姓名」關鍵字
         if (nameKey && !inputVal.includes(nameKey)) {
           showCustomModal(`第 ${i + 1} 道錯題輸入內容需包含姓名「${nameKey}」，請確認後重新輸入！`);
           return;
         }
 
-        // 組成指定格式： 38(B->C)..測驗[5]
+        // 格式化：38(B->C)..測驗[5]
         const item = wrongItems[i];
         formatSegments.push(`${item.bankId}(${item.userAns}->${item.correctAns})..測驗[${item.quizNum}]`);
       }
     }
 
-    // 2. 檢核手寫簽名
+    // 2. 檢核簽名
     if (!isFinalCanvasSigned) {
       showCustomModal('請於下方畫布完成手寫簽名後再送出！');
       return;
@@ -609,17 +607,19 @@
     const cvs = document.getElementById('finalCanvas');
     const signatureDataUrl = cvs.toDataURL('image/png');
 
-    // 多筆錯題以逗號串接
+    // 生成最終寫入 L 欄的字串，例如: 38(B->C)..測驗[5],12(A->D)..測驗[7]
     const reviewSummaryStr = formatSegments.join(',') || '無錯題';
 
     showLoading(true, '正在寫入確認紀錄與簽名...');
 
-    // 同時送出 reviewNotes 與 reviewNote，確保後端無論定義哪種變數均能正確取值
+    // 廣泛帶入各種命名可能，確保後端能接到值寫入 L 欄
     const postPayload = {
       action: 'submitSignature',
       rowIndex: submittedRowIndex,
       reviewNotes: reviewSummaryStr,
       reviewNote: reviewSummaryStr,
+      review_notes: reviewSummaryStr,
+      review: reviewSummaryStr,
       signatureData: signatureDataUrl
     };
 
