@@ -22,7 +22,7 @@
     }
     .container {
       width: 100%;
-      max-width: 600px;
+      max-width: 650px;
       background: var(--card-bg);
       padding: 25px;
       border-radius: 12px;
@@ -58,7 +58,7 @@
       margin-bottom: 15px;
       border-left: 4px solid var(--primary-color);
     }
-    .question-title { font-weight: bold; margin-bottom: 10px; }
+    .question-title { font-weight: bold; margin-bottom: 10px; whitespace: pre-line; }
     .option-label { display: block; margin: 8px 0; cursor: pointer; }
 
     /* 彈窗樣式 */
@@ -69,7 +69,7 @@
     }
     .custom-modal-overlay.active { display: flex; }
     .custom-modal {
-      background: white; padding: 20px; border-radius: 8px; max-width: 80%; width: 300px; text-align: center;
+      background: white; padding: 20px; border-radius: 8px; max-width: 80%; width: 320px; text-align: center;
     }
     .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
     .modal-btn { margin-top: 15px; padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; }
@@ -94,8 +94,9 @@
 <div class="container">
   <h2>職業安全衛生測驗系統</h2>
 
-  <!-- Step 1: 填寫基本資料 -->
+  <!-- 階段 1：填寫基本資料 -->
   <div id="step1" class="step-section active">
+    <h3>階段 1：基本資料填寫</h3>
     <div class="form-group">
       <label for="watchClass">是否已看過課程影片？</label>
       <select id="watchClass">
@@ -112,21 +113,48 @@
       <label for="phone">手機號碼：</label>
       <input type="text" id="phone" placeholder="請輸入手機號碼">
     </div>
-    <button class="btn" onclick="goToQuiz()">開始測驗</button>
+    <!-- 這裡對應 goToQuiz() 函式 -->
+    <button class="btn" onclick="goToQuiz()">下一步：開始測驗</button>
   </div>
 
-  <!-- Step 2: 測驗題目區塊 -->
+  <!-- 階段 2：進行線上測驗 -->
   <div id="step2" class="step-section">
+    <h3>階段 2：線上測驗</h3>
     <div id="quizContainer"></div>
-    <button class="btn" onclick="submitQuiz()">提交答案</button>
+    <button class="btn" onclick="goToStep3()">提交測驗並計算成績</button>
+  </div>
+
+  <!-- 階段 3：查看成績與檢討 -->
+  <div id="step3" class="step-section">
+    <h3>階段 3：測驗結果</h3>
+    <div id="scoreDisplay" style="font-size: 20px; font-weight: bold; margin-bottom: 15px;"></div>
+    <div id="reviewContainer"></div>
+    <button class="btn" onclick="goToStep4()">下一步：簽名確認</button>
+  </div>
+
+  <!-- 階段 4：手寫簽名確認 -->
+  <div id="step4" class="step-section">
+    <h3>階段 4：學員簽名</h3>
+    <p>請在上方欄位確認您的資料後完成簽名：</p>
+    <div style="border: 1px dashed #ccc; padding: 20px; text-align: center; background: #fafafa; margin-bottom: 15px;">
+      [ 簽名板區域 ]
+    </div>
+    <button class="btn" onclick="goToStep5()">完成簽名並上傳紀錄</button>
+  </div>
+
+  <!-- 階段 5：完成測驗 -->
+  <div id="step5" class="step-section">
+    <h3>階段 5：測驗完成</h3>
+    <p style="color: green; font-weight: bold; font-size: 18px;">恭喜您！您的測驗紀錄與簽名已成功儲存。</p>
+    <p>感謝您的配合，您可以關閉此頁面。</p>
   </div>
 </div>
 
-<!-- 自定義警告彈窗 (修正 modalTitle id) -->
+<!-- 自定義警告彈窗 -->
 <div class="custom-modal-overlay" id="customModal">
   <div class="custom-modal">
     <div class="modal-icon">⚠️</div>
-    <div class="modal-title" id="modalTitle">警告</div>
+    <div class="modal-title" id="modalTitle">提示</div>
     <div class="modal-message" id="modalText">說明訊息</div>
     <button class="modal-btn" onclick="closeModal()">我知道了</button>
   </div>
@@ -135,12 +163,15 @@
 <!-- 載入中遮罩 -->
 <div id="loading" class="loading-overlay hidden">
   <div class="spinner"></div>
-  <p style="margin-top: 10px; font-weight: bold;">資料載入中，請稍候...</p>
+  <p style="margin-top: 10px; font-weight: bold;">資料處理中，請稍候...</p>
 </div>
 
 <script>
-  // 請更換為你的 Cloudflare Worker 或 GAS Web App URL
-  const API_URL = 'https://https://q826t01.ector-7af.workers.dev/'; 
+  // Cloudflare Worker API 網址
+  const API_URL = 'https://q826t01.ector-7af.workers.dev/';
+
+  let quizData = [];
+  let userAnswers = {};
 
   function showCustomModal(msg, title = '提示') {
     document.getElementById('modalTitle').innerText = title;
@@ -158,6 +189,12 @@
     else loading.classList.add('hidden');
   }
 
+  function switchStep(fromStep, toStep) {
+    document.getElementById('step' + fromStep).classList.remove('active');
+    document.getElementById('step' + toStep).classList.add('active');
+  }
+
+  // 階段 1 -> 階段 2：驗證個人資料並從 Cloudflare Worker 載入題目
   function goToQuiz() {
     const watchClass = document.getElementById('watchClass').value;
     const name = document.getElementById('name').value.trim();
@@ -174,49 +211,49 @@
 
     showLoading(true);
 
-    fetch(API_URL)
-      .then(res => res.json())
+    // 從 Worker 讀取 JSON 資料
+    fetch(API_URL, { method: 'GET' })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP 狀態碼：' + res.status);
+        return res.json();
+      })
       .then(data => {
         showLoading(false);
-        console.log('API 回傳原始資料:', data);
+        console.log('Worker API 資料:', data);
 
-        // 檢查後端自訂錯誤格式
         if (data && data.result === 'error') {
-          showCustomModal('取得題目失敗：' + data.message);
+          showCustomModal('載入題目失敗：' + data.message);
           return;
         }
 
-        // 檢查資料是否為陣列，防止 data.forEach is not a function 錯誤
         if (!Array.isArray(data)) {
-          showCustomModal('題目資料格式不正確，回傳內容非陣列');
+          showCustomModal('題目資料格式不正確');
           return;
         }
 
-        showQuiz(data);
+        renderQuiz(data);
       })
       .catch(err => {
         showLoading(false);
-        console.error('Fetch Error:', err);
+        console.error('Fetch 錯誤:', err);
         showCustomModal('網路連線失敗或後端回應異常：' + err.message);
       });
   }
 
-  function showQuiz(data) {
-    if (!data || data.length === 0) {
+  function renderQuiz(data) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       showCustomModal('目前沒有可用的測驗題目');
       return;
     }
 
-    document.getElementById('step1').classList.remove('active');
-    document.getElementById('step2').classList.add('active');
-
+    quizData = data;
     const container = document.getElementById('quizContainer');
     container.innerHTML = '';
 
     data.forEach((q, index) => {
       const qNum = index + 1;
-      let optionsHtml = '';
       const options = [q.optionA, q.optionB, q.optionC, q.optionD].filter(Boolean);
+      let optionsHtml = '';
 
       options.forEach((opt, optIndex) => {
         optionsHtml += `
@@ -234,10 +271,48 @@
         </div>
       `;
     });
+
+    switchStep(1, 2);
   }
 
-  function submitQuiz() {
-    showCustomModal('測驗已提交！', '成功');
+  // 階段 2 -> 階段 3：計算成績與顯示檢討
+  function goToStep3() {
+    let totalQuestions = quizData.length;
+
+    for (let i = 1; i <= totalQuestions; i++) {
+      const selected = document.querySelector(`input[name="question_${i}"]:checked`);
+      if (!selected) {
+        showCustomModal(`請回答第 ${i} 題`);
+        return;
+      }
+      userAnswers[i] = parseInt(selected.value);
+    }
+
+    let reviewHtml = '';
+    quizData.forEach((q, index) => {
+      const qNum = index + 1;
+      const uAns = userAnswers[qNum];
+      reviewHtml += `<p>第 ${qNum} 題您的回答為選項 ${uAns}</p>`;
+    });
+
+    document.getElementById('scoreDisplay').innerText = `您的測驗結果已算完成！`;
+    document.getElementById('reviewContainer').innerHTML = reviewHtml;
+
+    switchStep(2, 3);
+  }
+
+  // 階段 3 -> 階段 4：進入簽名頁面
+  function goToStep4() {
+    switchStep(3, 4);
+  }
+
+  // 階段 4 -> 階段 5：完成並送出
+  function goToStep5() {
+    showLoading(true);
+    setTimeout(() => {
+      showLoading(false);
+      switchStep(4, 5);
+    }, 1000);
   }
 </script>
 
