@@ -114,6 +114,16 @@
       margin-bottom: 15px;
     }
 
+    .ans-detail {
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 8px 0;
+      padding: 10px;
+      background: #ffffff;
+      border-radius: 6px;
+      border: 1px solid #ffebee;
+    }
+
     .signature-box {
       margin-top: 25px;
       padding: 15px;
@@ -204,9 +214,9 @@
     <button class="btn" onclick="submitQuiz()">提交測驗並計算成績</button>
   </div>
 
-  <!-- 階段 3：測驗結果與錯題檢討 + 簽名 -->
+  <!-- 階段 3：測驗結果與錯題確認 + 簽名 -->
   <div id="step3" class="step-section">
-    <h3>階段 3：測驗結果與檢討</h3>
+    <h3>階段 3：測驗結果與檢討確認</h3>
     <div id="scoreDisplay" style="font-size: 20px; font-weight: bold; margin-bottom: 15px; color: var(--primary-color);"></div>
     <div id="reviewContainer"></div>
 
@@ -223,7 +233,7 @@
   <!-- 階段 4：完成 -->
   <div id="step4" class="step-section">
     <h3>測驗完成</h3>
-    <p style="color: var(--success-color); font-weight: bold; font-size: 18px;">恭喜您！您的測驗紀錄、錯題檢討與確認簽名已成功寫入系統。</p>
+    <p style="color: var(--success-color); font-weight: bold; font-size: 18px;">恭喜您！您的測驗紀錄、錯題確認與簽名已成功寫入系統。</p>
     <p>感謝您的配合，您可以關閉此頁面。</p>
   </div>
 </div>
@@ -363,6 +373,7 @@
       const parsed = parseQuestionContent(q);
       
       q.cleanQuestion = parsed.mainQuestion;
+      q.parsedOptions = parsed.options; // 儲存拆解後的選項資訊
 
       container.innerHTML += `
         <div class="question-card">
@@ -408,11 +419,16 @@
       if (uAns === qObj.answer) {
         correctCount++;
       } else {
+        const userAnsText = (qObj.parsedOptions && qObj.parsedOptions[uAns]) ? qObj.parsedOptions[uAns] : uAns;
+        const correctAnsText = (qObj.parsedOptions && qObj.parsedOptions[qObj.answer]) ? qObj.parsedOptions[qObj.answer] : qObj.answer;
+
         wrongItems.push({
           quizNum: i,
           bankId: qObj.bankId,
           userAns: uAns,
+          userAnsText: userAnsText,
           correctAns: qObj.answer,
+          correctAnsText: correctAnsText,
           question: qObj.cleanQuestion || qObj.question
         });
       }
@@ -468,19 +484,26 @@
     container.innerHTML = '';
 
     if (wrongItems.length === 0) {
-      container.innerHTML = `<p style="color:var(--success-color); font-weight:bold; font-size: 16px;">恭喜您全對！無需填寫錯題檢討。</p>`;
+      container.innerHTML = `<p style="color:var(--success-color); font-weight:bold; font-size: 16px;">恭喜您全對！無需填寫錯題確認。</p>`;
     } else {
-      let html = `<p style="color:var(--error-color); font-weight:bold; font-size: 15px;">您有 ${wrongItems.length} 題答錯。請於下方說明錯題原因與檢討心得：</p>`;
+      let html = `<p style="color:var(--error-color); font-weight:bold; font-size: 15px;">您有 ${wrongItems.length} 題答錯。請確認正確答案後，於各題填寫工號姓名表示確認：</p>`;
 
       wrongItems.forEach((item, index) => {
         html += `
           <div class="wrong-card">
             <p><strong>錯題 ${index + 1} (測驗第 ${item.quizNum} 題 / 題庫第 ${item.bankId} 題)：</strong></p>
             <p style="font-size: 15px;">${item.question}</p>
-            <p style="color:var(--error-color); font-weight: bold;">您的回答：${item.userAns} ❌ ｜ 正確答案：${item.correctAns}</p>
+            <div class="ans-detail">
+              <div style="color:var(--error-color); font-weight: bold; margin-bottom: 4px;">
+                ❌ 您的回答：${item.userAnsText}
+              </div>
+              <div style="color:var(--success-color); font-weight: bold;">
+                ⭕ 正確答案：${item.correctAnsText}
+              </div>
+            </div>
             <div class="form-group" style="margin-top: 10px;">
-              <label for="review_reason_${index}">錯題檢討與說明 (必填)：</label>
-              <textarea id="review_reason_${index}" rows="2" placeholder="請填寫此題答錯原因或觀念檢討..."></textarea>
+              <label for="review_reason_${index}">請輸入工號姓名表示已經確認 (必填)：</label>
+              <input type="text" id="review_reason_${index}" placeholder="範例：A12345 張小明">
             </div>
           </div>
         `;
@@ -549,16 +572,17 @@
   }
 
   function submitSignature() {
-    // 檢查錯題檢討輸入框
+    // 檢查錯題確認欄位
     let reviewNotesArr = [];
     if (wrongItems.length > 0) {
       for (let i = 0; i < wrongItems.length; i++) {
         const inputVal = document.getElementById(`review_reason_${i}`).value.trim();
         if (!inputVal) {
-          showCustomModal(`請完整填寫第 ${i + 1} 道錯題的檢討內容！`);
+          showCustomModal(`請於第 ${i + 1} 道錯題輸入工號姓名表示確認！`);
           return;
         }
-        reviewNotesArr.push(`[錯題${wrongItems[i].quizNum}(題號${wrongItems[i].bankId})]: ${inputVal}`);
+        // 打包包含題號、錯誤回答、正確答案與確認人資的完整紀錄
+        reviewNotesArr.push(`[錯題${wrongItems[i].quizNum}(題庫#${wrongItems[i].bankId})]: 答錯:${wrongItems[i].userAnsText} | 正確:${wrongItems[i].correctAnsText} | 確認者:${inputVal}`);
       }
     }
 
@@ -572,16 +596,20 @@
     const signatureDataUrl = cvs.toDataURL('image/png');
     const reviewSummaryStr = reviewNotesArr.join('； ') || '無錯題';
 
-    showLoading(true, '正在寫入檢討紀錄與確認簽名...');
+    showLoading(true, '正在寫入確認紀錄與簽名...');
+
+    // 同時帶上 reviewNotes 與 reviewNote 以防止 Cloudflare Worker 變數名稱綁定不一致
+    const postPayload = {
+      action: 'submitSignature',
+      rowIndex: submittedRowIndex,
+      reviewNotes: reviewSummaryStr,
+      reviewNote: reviewSummaryStr,
+      signatureData: signatureDataUrl
+    };
 
     fetch(API_URL, {
       method: 'POST',
-      body: JSON.stringify({
-        action: 'submitSignature',
-        rowIndex: submittedRowIndex,
-        reviewNotes: reviewSummaryStr,
-        signatureData: signatureDataUrl
-      })
+      body: JSON.stringify(postPayload)
     })
     .then(res => res.json())
     .then(resData => {
